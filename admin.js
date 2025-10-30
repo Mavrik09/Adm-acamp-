@@ -569,3 +569,318 @@ modal.addEventListener('click', (ev)=>{ if(ev.target === modal) closeModal(); })
 // ================= END =================
 // Observação: mantive e organizei as funções de pagamento e vínculo do seu admin.js original.
 // Referências: renderPaymentHistory / paymentForm / updateValorDevido / recalculateGroupStatus. :contentReference[oaicite:4]{index=4} :contentReference[oaicite:5]{index=5}
+
+// ============ Tema Automático + Alternância Manual ============
+const themeButton = document.getElementById('toggleTheme');
+
+// Função: aplica tema salvo no localStorage
+function applySavedTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark') {
+    document.body.classList.add('dark-mode');
+    themeButton.textContent = '🌞';
+  } else {
+    document.body.classList.remove('dark-mode');
+    themeButton.textContent = '🌙';
+  }
+}
+
+// Ao clicar: alterna entre claro/escuro
+themeButton?.addEventListener('click', () => {
+  const isDark = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  themeButton.textContent = isDark ? '🌞' : '🌙';
+});
+
+// Aplica o tema salvo ao carregar
+applySavedTheme();
+
+
+// ---------- Novas Funções (Iteração 1) ----------
+
+/**
+ * Gera um ícone clicável do WhatsApp se o participante tiver um número de telefone.
+ * @param {string} telefone - O número de telefone do participante.
+ * @param {string} nome - O nome do participante para a mensagem padrão.
+ * @returns {string} - O HTML do ícone do WhatsApp ou uma string vazia.
+ */
+function gerarLinkWhatsApp(telefone, nome) {
+  if (!telefone) return '';
+  const telefoneLimpo = telefone.replace(/\D/g, '');
+  if (telefoneLimpo.length < 10) return ''; // Validação mínima (DDD + número)
+  const url = `https://wa.me/55${telefoneLimpo}?text=Olá%20${encodeURIComponent(nome)},%20tudo%20bem?%20Estamos%20entrando%20em%20contato%20referente%20à%20sua%20inscrição%20no%20Acamp'26.`;
+  return `<a href="${url}" target="_blank" title="Chamar no WhatsApp" style="margin-left: 8px; text-decoration: none;">📱</a>`;
+}
+
+/**
+ * Cria um marcador visual para participantes que são titulares.
+ * @param {string} vinculo - O campo de vínculo do participante.
+ * @returns {string} - O HTML do marcador de titular ou uma string vazia.
+ */
+function destacarTitulares(vinculo) {
+  if (vinculo === 'Titular') {
+    return `<span style="background-color: #0b5fff; color: white; padding: 3px 8px; border-radius: 5px; font-size: 12px; margin-left: 8px;">Titular</span>`;
+  }
+  return '';
+}
+
+// Atualizando a função loadInscricoes para incluir as novas funcionalidades
+async function loadInscricoes(){
+  inscricoesBody.innerHTML = '<tr><td colspan="4">Carregando...</td></tr>';
+  const status = (statusFilter?.value || 'Todos');
+  const abba = (abbaFilter?.value || 'Todos');
+  const term = (searchName?.value||'').toLowerCase().trim();
+
+  try{
+    let query = db.collection('inscricoes').orderBy('dataCadastro','desc').limit(1000);
+    if(status && status !== 'Todos') query = db.collection('inscricoes').where('statusPagamento','==',status).orderBy('dataCadastro','desc').limit(1000);
+    const snap = await query.get();
+    currentInscricoesData = [];
+    inscricoesBody.innerHTML = '';
+    snap.forEach(doc=>{
+      const d = doc.data(); d.id = doc.id;
+      if(abba && abba !== 'Todos'){
+        const abbaBool = abba === 'Sim';
+        if(d.pertenceABBApai !== abbaBool) return;
+      }
+      if(term){
+        const nome = (d.nomeCompleto||'').toLowerCase();
+        const email = (d.email||'').toLowerCase();
+        if(!nome.includes(term) && !email.includes(term)) return;
+      }
+      currentInscricoesData.push(d);
+      // Criando tr com data-labels para responsividade
+      const tr = document.createElement('tr');
+
+      const tdNome = document.createElement('td');
+      tdNome.innerHTML = `${d.nomeCompleto || '—'} ${destacarTitulares(d.vinculo)} ${gerarLinkWhatsApp(d.telefone, d.nomeCompleto)}`;
+      tdNome.setAttribute('data-label','Nome');
+      tr.appendChild(tdNome);
+
+      const tdEmail = document.createElement('td');
+      tdEmail.textContent = d.email || '—';
+      tdEmail.setAttribute('data-label','E-mail');
+      tr.appendChild(tdEmail);
+
+      const tdStatus = document.createElement('td');
+      tdStatus.innerHTML = `<span class="status-pill">${d.statusPagamento || 'PENDENTE'}</span>`;
+      tdStatus.setAttribute('data-label','Status');
+      tr.appendChild(tdStatus);
+
+      const tdAcoes = document.createElement('td');
+      tdAcoes.setAttribute('data-label','Ações');
+      const btn = document.createElement('button');
+      btn.textContent = 'Ver / Editar';
+      btn.className = 'action-btn';
+      btn.onclick = ()=> editInscricao(d.id);
+      tdAcoes.appendChild(btn);
+      tr.appendChild(tdAcoes);
+
+      inscricoesBody.appendChild(tr);
+    });
+    if(currentInscricoesData.length === 0) inscricoesBody.innerHTML = '<tr><td colspan="4">Nenhuma inscrição encontrada.</td></tr>';
+  } catch(err){
+    console.error(err);
+    inscricoesBody.innerHTML = '<tr><td colspan="4" style="color:red">Erro ao carregar. Ver console.</td></tr>';
+  }
+}
+
+
+// ---------- Novas Funções (Iteração 2) ----------
+
+/**
+ * Determina o nível de risco com base nas descrições de restrições/alergias.
+ * @param {string} descricao - A descrição da restrição ou alergia.
+ * @returns {string} - O nível de risco ('Alto', 'Moderado', 'Leve').
+ */
+function determinarNivelRisco(descricao) {
+  if (!descricao) return 'Leve';
+  const desc = descricao.toLowerCase();
+  
+  // Palavras-chave para Alto Risco
+  const altoRiscoKeywords = ['anafilaxia', 'crise epiléptica', 'asma grave', 'diabete tipo 1', 'insulina', 'emergência', 'risco de vida'];
+  if (altoRiscoKeywords.some(keyword => desc.includes(keyword))) {
+    return 'Alto';
+  }
+  
+  // Palavras-chave para Risco Moderado
+  const moderadoRiscoKeywords = ['glúten', 'lactose', 'ovo', 'amendoim', 'frutos do mar', 'medicamento', 'restrição alimentar', 'condição crônica'];
+  if (moderadoRiscoKeywords.some(keyword => desc.includes(keyword))) {
+    return 'Moderado';
+  }
+  
+  return 'Leve';
+}
+
+/**
+ * Retorna a cor de destaque e o texto do nível de risco.
+ * @param {string} nivel - O nível de risco ('Alto', 'Moderado', 'Leve').
+ * @returns {{color: string, text: string}} - Objeto com a cor de fundo e o texto.
+ */
+function getColorByRisco(nivel) {
+  switch (nivel) {
+    case 'Alto':
+      return { color: '#fee2e2', text: 'Alto Risco', textColor: '#b91c1c' }; // Vermelho Claro
+    case 'Moderado':
+      return { color: '#fef3c7', text: 'Risco Moderado', textColor: '#a16207' }; // Amarelo Claro
+    case 'Leve':
+    default:
+      return { color: '#dcfce7', text: 'Restrição Leve', textColor: '#15803d' }; // Verde Claro
+  }
+}
+
+/**
+ * Salva o nível de risco manualmente selecionado no Firebase.
+ * @param {string} docId - O ID do documento do participante.
+ */
+async function saveHealthRisk(docId) {
+  const select = document.getElementById(`risk_level_${docId}`);
+  const nivelRisco = select.value;
+  const messageEl = document.getElementById(`healthMessage_${docId}`);
+  messageEl.textContent = 'Salvando...';
+  messageEl.style.color = 'darkred';
+
+  try {
+    await db.collection('inscricoes').doc(docId).update({
+      nivelRiscoSaude: nivelRisco,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    messageEl.textContent = 'Risco salvo!';
+    messageEl.style.color = 'green';
+    setTimeout(() => messageEl.textContent = '', 3000);
+    // Recarrega a linha ou a tabela para refletir a mudança
+    loadHealthInscricoes(); 
+  } catch (err) {
+    console.error(err);
+    messageEl.textContent = 'Erro ao salvar risco.';
+    messageEl.style.color = 'red';
+  }
+}
+
+// Atualizando a função loadHealthInscricoes para incluir a coloração de risco
+async function loadHealthInscricoes(){
+  inscricoesBodySaude.innerHTML = '<tr><td colspan="5">Carregando...</td></tr>';
+  const term = (searchNameHealth?.value||'').toLowerCase().trim();
+  try{
+    const snap = await db.collection('inscricoes').orderBy('nomeCompleto','asc').get();
+    inscricoesBodySaude.innerHTML = '';
+    let found = false;
+    snap.forEach(doc=>{
+      const d = doc.data(); d.id=doc.id;
+      const hasFood = d.restricaoAlimentar===true || (d.restricaoAlimentarDescricao && d.restricaoAlimentarDescricao.trim()!=='');
+      const hasCond = d.condicaoSaudeAlergia===true || (d.condicaoSaudeAlergiaDescricao && d.condicaoSaudeAlergiaDescricao.trim()!=='');
+      const isMinor = d.menorDeIdade===true;
+      
+      // Se não tem restrição/alergia/menor, não exibe
+      if(!(hasFood||hasCond||isMinor)) return;
+      
+      if(term){
+        const nome = (d.nomeCompleto||'').toLowerCase(); const email = (d.email||'').toLowerCase();
+        if(!nome.includes(term) && !email.includes(term)) return;
+      }
+      found = true;
+      
+      // 1. Determinar o nível de risco
+      let nivelRisco = d.nivelRiscoSaude; // Tenta pegar o nível salvo manualmente
+      if (!nivelRisco) {
+        // Se não houver nível salvo, determina automaticamente
+        const descricaoCompleta = `${d.restricaoAlimentarDescricao || ''} ${d.condicaoSaudeAlergiaDescricao || ''}`;
+        nivelRisco = determinarNivelRisco(descricaoCompleta.trim());
+      }
+      
+      // 2. Obter a cor e o texto
+      const risco = getColorByRisco(nivelRisco);
+      
+      const tr = document.createElement('tr');
+      // 3. Aplicar a cor de fundo à linha
+      tr.style.backgroundColor = risco.color;
+      
+      const tdNome = document.createElement('td'); 
+      tdNome.setAttribute('data-label','Nome / Tel'); 
+      tdNome.innerHTML = `<strong>${d.nomeCompleto||'—'}</strong><br/>Tel: ${d.telefone||'N/A'}`; 
+      tr.appendChild(tdNome);
+      
+      const tdRestr = document.createElement('td'); 
+      tdRestr.setAttribute('data-label','Restrição'); 
+      tdRestr.textContent = hasFood ? (d.restricaoAlimentarDescricao||'—') : 'Nenhuma'; 
+      tr.appendChild(tdRestr);
+      
+      // 4. Adicionar a coluna de Nível de Risco e o seletor
+      const tdRisco = document.createElement('td');
+      tdRisco.setAttribute('data-label','Nível de Risco');
+      tdRisco.innerHTML = `
+        <select id="risk_level_${d.id}" onchange="saveHealthRisk('${d.id}')" style="background:${risco.color}; color:${risco.textColor}; font-weight:700; border:1px solid ${risco.textColor}; padding: 4px 8px; border-radius: 6px;">
+          <option value="Alto" ${nivelRisco === 'Alto' ? 'selected' : ''}>Alto Risco</option>
+          <option value="Moderado" ${nivelRisco === 'Moderado' ? 'selected' : ''}>Risco Moderado</option>
+          <option value="Leve" ${nivelRisco === 'Leve' ? 'selected' : ''}>Restrição Leve</option>
+        </select>
+        <p style="font-size:11px; margin-top:4px;">(Cor: ${risco.text})</p>
+      `;
+      tr.appendChild(tdRisco);
+      
+      const tdCond = document.createElement('td'); 
+      tdCond.setAttribute('data-label','Condição'); 
+      tdCond.textContent = hasCond ? (d.condicaoSaudeAlergiaDescricao||'—') : 'Nenhuma'; 
+      tr.appendChild(tdCond);
+      
+      const tdMenor = document.createElement('td'); 
+      tdMenor.setAttribute('data-label','Menor'); 
+      tdMenor.textContent = isMinor ? 'SIM' : 'NÃO'; 
+      tr.appendChild(tdMenor);
+      
+      const tdNotes = document.createElement('td'); 
+      tdNotes.setAttribute('data-label','Notas ADM');
+      tdNotes.innerHTML = `<textarea id="notes_${d.id}" rows="3" style="width:95%">${d.notasSaudeAdm||''}</textarea>
+        <button onclick="saveHealthNotes('${d.id}')" style="margin-top:6px">Salvar Nota</button>
+        <p id="healthMessage_${d.id}" style="margin:0;color:darkred"></p>`;
+      tr.appendChild(tdNotes);
+      
+      inscricoesBodySaude.appendChild(tr);
+    });
+    if(!found) inscricoesBodySaude.innerHTML = '<tr><td colspan="5">Nenhum participante com atenção especial encontrado.</td></tr>';
+  }catch(err){ console.error(err); inscricoesBodySaude.innerHTML = '<tr><td colspan="5" style="color:red">Erro ao carregar</td></tr>'; }
+}
+
+// Re-executando a função loadHealthInscricoes para garantir que as novas funções sejam usadas
+loadHealthInscricoes();
+
+
+// =================================================================================
+// DOCUMENTAÇÃO DAS NOVAS FUNÇÕES
+// =================================================================================
+
+/**
+ * Funções implementadas para atender aos requisitos do cliente:
+ * 
+ * 1. gerarLinkWhatsApp(telefone, nome)
+ *    - Objetivo: Cria um link clicável para o WhatsApp Web/App com uma mensagem padrão,
+ *      formatando o número de telefone (removendo caracteres não numéricos).
+ *    - Uso: Chamada dentro de `loadInscricoes` para adicionar o ícone ao lado do nome do participante.
+ * 
+ * 2. destacarTitulares(vinculo)
+ *    - Objetivo: Gera um selo visualmente destacado (fundo azul) com o texto "Titular"
+ *      se o campo `vinculo` do participante for estritamente igual a "Titular".
+ *    - Uso: Chamada dentro de `loadInscricoes` para adicionar o selo ao lado do nome.
+ * 
+ * 3. determinarNivelRisco(descricao)
+ *    - Objetivo: Analisa a descrição de restrições/alergias e atribui um nível de risco
+ *      ('Alto', 'Moderado', 'Leve') com base em palavras-chave específicas (ex: "anafilaxia" -> Alto).
+ *    - Uso: Chamada dentro de `loadHealthInscricoes` quando o campo `nivelRiscoSaude` não está preenchido no Firebase.
+ * 
+ * 4. getColorByRisco(nivel)
+ *    - Objetivo: Retorna um objeto com a cor de fundo, cor do texto e texto descritivo
+ *      baseado no nível de risco ('Alto', 'Moderado', 'Leve') para coloração da linha da tabela.
+ *    - Uso: Chamada dentro de `loadHealthInscricoes` para definir o estilo da linha e do seletor.
+ * 
+ * 5. saveHealthRisk(docId)
+ *    - Objetivo: Salva o nível de risco selecionado manualmente pelo administrador
+ *      no campo `nivelRiscoSaude` do documento do participante no Firebase.
+ *    - Uso: Função de callback acionada pelo evento `onchange` do seletor de risco na aba Saúde.
+ * 
+ * As funções `loadInscricoes` e `loadHealthInscricoes` foram atualizadas para incorporar
+ * essas novas lógicas e garantir a integração visual e funcional.
+ */
+
+// =================================================================================
+// FIM DA DOCUMENTAÇÃO
+// =================================================================================
