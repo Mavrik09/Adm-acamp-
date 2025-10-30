@@ -136,6 +136,30 @@
     .actions-row .btn{width:100%}
     .sugg-item{padding:12px}
   }
+
+  /* ======== Ajuste do botão "Ver / Editar" no mobile ======== */
+.action-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.action-btn:hover {
+  filter: brightness(0.95);
+}
+
+/* Desktop: tamanho normal */
+@media (min-width: 761px) {
+  .action-btn {
+    width: auto !important;
+    display: inline-block !important;
+  }
+}
   /* responsive table -> card style for small screens using data-label */
   @media(max-width:760px){
     table, thead, tbody, th, td, tr { display:block; }
@@ -144,12 +168,65 @@
     td { border:0; padding:8px 10px; position:relative; }
     td::before { content: attr(data-label); font-weight:700; display:block; color:var(--muted); margin-bottom:6px; }
     /* action button full width */
-    .action-btn { display:block; width:100%; box-sizing:border-box; margin-top:8px; }
+    .action-btn {
+    display: inline-block;
+    width: auto;
+    margin-top: 6px;
+    align-self: flex-start;
+  }
+  td[data-label="Ações"] {
+    text-align: right;
+  }
   }
 
   /* small tweaks */
   .muted{color:var(--muted);}
   .mini{font-size:13px}
+  /* ========= AJUSTES DE RESPONSIVIDADE DO <tbody> ========= */
+
+/* Mobile: cards compactos dentro do tbody */
+@media (max-width: 760px) {
+  #inscricoesBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #inscricoesBody tr {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+
+  #inscricoesBody td {
+    padding: 6px 0;
+    border: none;
+  }
+
+  #inscricoesBody td::before {
+    content: attr(data-label);
+    display: block;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  /* remove largura mínima que estava deixando grande */
+  table {
+    min-width: unset !important;
+  }
+
+  /* remove sombra dupla e overflow horizontal */
+  .table-container {
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+}
+
 </style>
 </head>
 <body>
