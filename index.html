@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -10,32 +11,47 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
+<!-- Lib para exportar DOCX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.0.3/docx.min.js"></script>
+
 <style>
   :root{
-    --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --accent:#0b5fff; --danger:#dc2626; --radius:12px;
+    --accent:#0b5fff; --danger:#dc2626; --radius:12px;
+    --row-green:#dcfce7; --row-orange:#ffedd5; --row-red:#fee2e2;
+
+    --bg-dark:#1e293b; --card-dark:#334155; --muted-dark:#94a3b8; --text-dark:#f8fafc;
+    --bg-light:linear-gradient(180deg,#f8fbff,#f5f7fb); --card-light:#ffffff; --muted-light:#6b7280; --text-light:#0f172a;
+
+    --bg:var(--bg-light); --card:var(--card-light); --muted:var(--muted-light); --text:var(--text-light);
+
+    --row-green-bg: #dcfce7; --row-orange-bg: #ffedd5; --row-red-bg: #fee2e2;
+    --row-green-text: #065f46; --row-orange-text: #9a3412; --row-red-text: #991b1b;
+  }
+  body.dark-mode {
+    --bg:var(--bg-dark); --card:var(--card-dark); --muted:var(--muted-dark); --text:var(--text-dark);
   }
   *{box-sizing:border-box}
-  body{font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#f8fbff,#f5f7fb);margin:0;color:#0f172a;-webkit-font-smoothing:antialiased}
+  body{font-family:Inter,system-ui,Arial;background:var(--bg);margin:0;color:var(--text);-webkit-font-smoothing:antialiased; transition: background 0.3s, color 0.3s;}
   .wrap{max-width:1200px;margin:20px auto;padding:16px}
-  .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:0 8px 30px rgba(2,6,23,0.06);margin-bottom:16px}
+  .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:0 8px 30px rgba(2,6,23,0.06);margin-bottom:16px;transition:background 0.3s, color 0.3s}
   .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px;flex-wrap:wrap}
   .brand h1{color:var(--accent);font-size:20px;margin:0}
   .logout-btn{background:#ef4444;color:#fff;border:0;padding:8px 12px;border-radius:10px;cursor:pointer}
   .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
   .tablink{padding:10px 14px;border-radius:10px;border:0;background:transparent;color:var(--muted);cursor:pointer}
-  .tablink.active{background:var(--card);color:var(--accent);font-weight:700;box-shadow:0 6px 18px rgba(11,95,255,0.06)}
+  .tablink.active{background:var(--card);color:var(--accent);font-weight:700;box-shadow:0 6px 18px rgba(11,95,255,0.06);transition:background 0.3s, color 0.3s}
   .filters-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   @media(max-width:920px){.filters-grid{grid-template-columns:1fr}}
   .filters-grid label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6e9ee;background:#fbfdff}
+  input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e6e9ee;background:var(--card);color:var(--text);transition:background 0.3s, color 0.3s}
   .actions-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
   .btn{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700}
   .btn-primary{background:var(--accent);color:#fff}
   .btn-ghost{background:transparent;border:1px solid #e6e9ee;color:var(--muted)}
   table{width:100%;border-collapse:collapse;min-width:700px}
-  th{padding:12px 16px;background:#fbfdff;color:var(--accent);text-align:left}
+  th{padding:12px 16px;background:var(--card);color:var(--accent);text-align:left;transition:background 0.3s, color 0.3s}
   td{padding:12px 16px;border-bottom:1px solid #f3f6fb;vertical-align:top}
-  tr:hover td{background:#fbfdff}
+  tr:hover td{background:var(--bg)}
   .status-pill{padding:6px 8px;border-radius:999px;font-weight:700;font-size:12px}
   .table-container{overflow:auto;border-radius:12px}
   /* Modal organised */
@@ -66,7 +82,7 @@
     justify-content: space-between;
     padding: 14px 20px;
     border-bottom: 1px solid #f2f6fb;
-    background: #fff;
+    background: var(--card);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -83,7 +99,7 @@
     flex-shrink: 0;
     padding: 12px 18px;
     border-top: 1px solid #f2f6fb;
-    background: #fff;
+    background: var(--card);
     position: sticky;
     bottom: 0;
   }
@@ -100,10 +116,10 @@
       border-radius: 0;
     }
   }
-  .side-card{background:#fff;padding:12px;border-radius:10px;border:1px solid #f3f6fb}
-  #masterSearchSuggestions{margin-top:6px;border-radius:10px;max-height:220px;overflow:auto;background:#fff;border:1px solid #f0f4ff}
-  .sugg-item{padding:10px 12px;border-bottom:1px solid #f5f7fb;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-  .sugg-item:hover{background:#fbfdff}
+  .side-card{background:var(--card);padding:12px;border-radius:10px;border:1px solid #f3f6fb;transition:background 0.3s, color 0.3s}
+  #masterSearchSuggestions{margin-top:6px;border-radius:10px;max-height:220px;overflow:auto;background:var(--card);border:1px solid #f0f4ff}
+  .sugg-item{padding:10px 12px;border-bottom:1px solid #f5f7fb;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--card);color:var(--text);transition:background 0.3s, color 0.3s}
+  .sugg-item:hover{background:var(--bg)}
   .helper{font-size:13px;color:var(--muted);margin-top:8px}
   .payment-row{display:flex;gap:10px;flex-wrap:wrap}
   .payment-row > *{flex:1;min-width:140px}
@@ -131,7 +147,7 @@
   @media(max-width:760px){
     table, thead, tbody, th, td, tr { display:block; }
     thead { display:none; }
-    tr { margin-bottom:12px; border-radius:10px; background:#fff; box-shadow:0 6px 18px rgba(2,6,23,0.04); padding:10px; }
+    tr { margin-bottom:12px; border-radius:10px; background:var(--card); box-shadow:0 6px 18px rgba(2,6,23,0.04); padding:10px; }
     td { border:0; padding:8px 10px; position:relative; }
     td::before { content: attr(data-label); font-weight:700; display:block; color:var(--muted); margin-bottom:6px; }
     .action-btn { display: inline-block; width: auto; margin-top: 6px; align-self: flex-start; }
@@ -141,7 +157,7 @@
   .mini{font-size:13px}
   @media (max-width: 760px) {
     #inscricoesBody { display: flex; flex-direction: column; gap: 10px; }
-    #inscricoesBody tr { display: flex; flex-direction: column; background: #fff; border-radius: 10px; padding: 10px 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    #inscricoesBody tr { display: flex; flex-direction: column; background: var(--card); border-radius: 10px; padding: 10px 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); transition: background 0.3s, color 0.3s; }
     #inscricoesBody td { padding: 6px 0; border: none; }
     #inscricoesBody td::before { content: attr(data-label); display: block; font-weight: 600; color: var(--muted); font-size: 13px; margin-bottom: 2px; }
     table { min-width: unset !important; }
@@ -170,6 +186,7 @@
     <div class="header card header">
       <div class="brand"><h1>Painel Administrativo — Inscrições</h1></div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <button id="themeToggle" class="btn btn-ghost" title="Alternar Tema">🌞</button>
         <button id="exportCsvButton" class="btn" style="background:#16a34a;color:#fff">Exportar CSV</button>
         <button id="logoutButton" class="logout-btn">Sair</button>
       </div>
@@ -243,7 +260,10 @@
 
     <!-- HEALTH -->
     <div id="dashboardHealth" class="card" style="display:none">
-      <h3>Participantes com Restrições/Alergias</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h3>Participantes com Restrições/Alergias</h3>
+        <button id="exportHealthDocx" class="btn btn-primary">📄 Baixar DOCX</button>
+      </div>
       <div style="margin-top:12px">
         <label>Buscar por Nome/Email</label>
         <input id="searchNameHealth" type="text" placeholder="Digite para filtrar (busca automática)"/>
@@ -256,7 +276,6 @@
       </div>
     </div>
   </div>
-</div>
 
 <!-- REORGANIZED MODAL -->
 <div id="modalAdmin" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalAdminTitle">
@@ -378,7 +397,9 @@
     </div>
   </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.5.1/build/index.umd.js"></script>
 
+<script src="https://cdn.jsdelivr.net/npm/docx@8.0.3/build/index.umd.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>
